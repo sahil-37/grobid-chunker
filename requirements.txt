@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+sentence-transformers
+lxml
+torch
+transformers
+python-multipart

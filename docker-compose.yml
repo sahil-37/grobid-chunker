@@ -1,0 +1,26 @@
+version: '3.9'
+
+services:
+  grobid:
+    image: lfoppiano/grobid:0.8.1
+    container_name: grobid
+    restart: always
+    ports:
+      - "8070:8070"
+    platform: linux/amd64
+    environment:
+      - GROBID__NB_THREADS=2
+      - GROBID__MAX_CONNECTIONS=20
+
+  fastapi_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    restart: always
+    volumes:
+      - ./app/outputs:/app/app/outputs
+    ports:
+      - "8000:8000"
+    depends_on:
+      - grobid
