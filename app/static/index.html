@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🔬 Section Extractor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.22.1/ace.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js";
+  </script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .card { width: 100%; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+    .card-header { background:#f0f0f0; padding:12px; font-size:18px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+    .card-body { display:none; padding:16px; background:#fafafa; animation:fadeIn 0.3s; }
+    .row { display:flex; flex-wrap:wrap; gap:20px; }
+    .panel { flex:1; min-width:300px; max-width:48%; height:600px; overflow-y:auto; border:1px solid #ccc; padding:10px; background:white; }
+    .output { margin-top:20px; white-space:pre-wrap; background:#eef; padding:10px; border-radius:6px; }
+    #loading { display:none; font-weight:bold; color:green; margin-top:10px; }
+    canvas { width:100%; height:auto; object-fit:contain; }
+    @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+    button.toggle-btn { background:#007BFF; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer; font-size:14px; }
+  </style>
+</head>
+<body>
+  <h1>🔬 Section Extractor</h1>
+  <form id="uploadForm">
+    <input type="file" id="fileInput" multiple accept="application/pdf">
+    <button type="submit">Upload</button>
+  </form>
+
+  <div id="loading">⏳ Processing files… Please wait…</div>
+  <div id="results"></div>
+
+  <script>
+    document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const files = document.getElementById("fileInput").files;
+      if (!files.length) return;
+
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "";
+      document.getElementById("loading").style.display = "block";
+
+      const formData = new FormData();
+      for (const file of files) formData.append("files", file);
+
+      try {
+        const res = await fetch("/extract-all/", { method: "POST", body: formData });
+        const data = await res.json();
+        document.getElementById("loading").style.display = "none";
+
+        data.forEach((doc, idx) => {
+          const file = files[idx];
+          const card = document.createElement("div");
+          card.className = "card";
+
+          const header = document.createElement("div");
+          header.className = "card-header";
+          header.innerHTML = `📄 ${doc.filename} <button class="toggle-btn">Expand</button>`;
+          card.appendChild(header);
+
+          const body = document.createElement("div");
+          body.className = "card-body";
+          const row = document.createElement("div");
+          row.className = "row";
+
+          const pdfPanel = document.createElement("div");
+          pdfPanel.className = "panel";
+          const canvasContainer = document.createElement("div");
+          pdfPanel.appendChild(canvasContainer);
+          row.appendChild(pdfPanel);
+
+          const xmlPanel = document.createElement("div");
+          xmlPanel.className = "panel";
+          const editorDiv = document.createElement("div");
+          editorDiv.id = "editor-" + idx;
+          editorDiv.style.width = "100%";
+          editorDiv.style.height = "100%";
+          xmlPanel.appendChild(editorDiv);
+          row.appendChild(xmlPanel);
+
+          body.appendChild(row);
+
+          const output = document.createElement("div");
+          output.className = "output";
+
+          if (doc.extracted_sections) {
+            for (const [key, section] of Object.entries(doc.extracted_sections)) {
+              const heading = section.heading || key;
+              const content = section.content || [];
+
+              const block = document.createElement("div");
+
+              let icon = "📘";
+              const lowerKey = key.toLowerCase();
+              if (lowerKey.includes("results") && lowerKey.includes("discussion")) {
+                icon = "🧪";
+              } else if (lowerKey.includes("methods")) {
+                icon = "🔧";
+              } else if (lowerKey.includes("results")) {
+                icon = "📊";
+              } else if (lowerKey.includes("discussion")) {
+                icon = "💬";
+              } else if (lowerKey.includes("abstract")) {
+                icon = "🧾";
+              } else if (lowerKey.includes("title")) {
+                icon = "📌";
+              }
+
+              block.innerHTML = `<b>${icon} ${heading}</b><br><br>`;
+
+              if (Array.isArray(content)) {
+                block.innerHTML += content.map(p => {
+                  if (p.startsWith("## ")) {
+                    return `<p><strong>${p.replace("## ", "")}</strong></p>`;
+                  }
+                  return `<p>${p}</p>`;
+                }).join("");
+              } else {
+                block.innerHTML += `<p>${content}</p>`;
+              }
+
+              block.style.marginBottom = "20px";
+              output.appendChild(block);
+            }
+          } else {
+            output.innerHTML = `<b>⚠️</b> ${doc.error || "No sections found."}`;
+          }
+
+          body.appendChild(output);
+          card.appendChild(body);
+          resultsDiv.appendChild(card);
+
+          const toggleBtn = header.querySelector(".toggle-btn");
+          toggleBtn.addEventListener("click", () => {
+            body.style.display = (body.style.display === "none") ? "block" : "none";
+            toggleBtn.textContent = (body.style.display === "block") ? "Collapse" : "Expand";
+          });
+
+          if (idx === 0) {
+            body.style.display = "block";
+            toggleBtn.textContent = "Collapse";
+          }
+
+          const fileReader = new FileReader();
+          fileReader.onload = async function () {
+            const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(this.result) }).promise;
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              const viewport = page.getViewport({ scale: 1.2 });
+              const c = document.createElement("canvas");
+              c.style.marginBottom = "10px";
+              c.width = viewport.width;
+              c.height = viewport.height;
+              await page.render({ canvasContext: c.getContext("2d"), viewport }).promise;
+              canvasContainer.appendChild(c);
+            }
+          };
+          fileReader.readAsArrayBuffer(file);
+
+          setTimeout(() => {
+            const editor = ace.edit(editorDiv.id);
+            editor.setTheme("ace/theme/github");
+            editor.session.setMode("ace/mode/xml");
+            editor.setValue(doc.tei_xml || "No TEI XML", -1);
+            editor.setReadOnly(true);
+          }, 100);
+        });
+
+      } catch (err) {
+        document.getElementById("loading").style.display = "none";
+        alert("⚠️ Something went wrong while contacting the server.");
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
