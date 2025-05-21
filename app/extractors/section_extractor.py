@@ -1,15 +1,21 @@
-from __future__ import annotations
+import re
 from typing import Any, List, Dict
 from lxml import etree
 
 from app.models import (
-    NS, RESULTS_ANCHORS, DISCUSSION_ANCHORS, DISCUSSION_STOPWORDS,
-    ABSTRACT_ALTERNATES, MERGED_RESULTS_DISCUSSION_ANCHORS
+    NS,
+    RESULTS_DISCUSSION_ANCHORS,
+    RESULTS_STOPWORDS,
+    DISCUSSION_STOPWORDS,
+    ABSTRACT_ALTERNATES,
 )
 from app.utils.tei_helpers import _clean, _div_heading
 from app.utils.semantic_utils import is_semantic_heading_match
 
-STOPWORD_SIM_THRESHOLD = 0.65  # adjust if needed
+# — strip leading numbering (e.g. “3.1. Results …” → “Results …”) for matching only
+_LEADING_NUM_RE = re.compile(r"^\s*\d+(?:\.\d+)*[\.\)\:]?\s*")
+def _norm_head(raw: str) -> str:
+    return _LEADING_NUM_RE.sub("", raw).strip()
 
 def extract_structured_sections(xml_str: str) -> Dict[str, Any]:
     try:
@@ -19,10 +25,8 @@ def extract_structured_sections(xml_str: str) -> Dict[str, Any]:
 
     divs = tree.xpath(".//tei:body//tei:div", namespaces=NS)
 
-    # ─────────────── Title
+    # ─── Title + Abstract ─────────────────────────────────────────────────────
     title = _clean(tree.xpath("string(.//tei:titleStmt/tei:title)", namespaces=NS))
-
-    # ─────────────── Abstract
     abstract = [
         _clean("".join(p.itertext()))
         for p in tree.xpath(".//tei:abstract//tei:p", namespaces=NS)
@@ -31,72 +35,68 @@ def extract_structured_sections(xml_str: str) -> Dict[str, Any]:
     abstract_heading = "abstract"
     if not abstract:
         for d in divs:
-            head = _div_heading(d)
-            if head and is_semantic_heading_match(head, ABSTRACT_ALTERNATES):
+            raw_h = _div_heading(d)
+            h = _norm_head(raw_h) if raw_h else ""
+            if h and is_semantic_heading_match(h, ABSTRACT_ALTERNATES):
                 abstract = [
                     _clean("".join(p.itertext()))
                     for p in d.xpath(".//tei:p", namespaces=NS)
                     if _clean("".join(p.itertext()))
                 ]
-                abstract_heading = head
+                abstract_heading = raw_h
                 break
 
-    # ─────────────── Results + Discussion Section
-    def extract_results_discussion() -> Dict[str, Any]:
+    # ─── Unified Results + Discussion ─────────────────────────────────────────
+    def extract_unified_rd() -> Dict[str, Any]:
+        anchors   = RESULTS_DISCUSSION_ANCHORS
+        stopwords = RESULTS_STOPWORDS | DISCUSSION_STOPWORDS
+
         capturing = False
-        matched_heading: str | None = None
-        sections: Dict[str, List[str]] = {}
-        subheadings: List[str] = []
-        unnamed_count = 0
+        main_heading: str | None = None
+        subsections: List[Dict[str,Any]] = []
+        current = {"subheading": None, "content": []}
 
         for d in divs:
-            head = _div_heading(d)
-            head_lower = head.lower().strip() if head else ""
+            raw_h = _div_heading(d)               # e.g. "3. Results and discussion"
+            h = _norm_head(raw_h) if raw_h else "" # → "Results and discussion"
 
-            # 🚫 Hard stop — exact or semantic stopword match
-            if head and (
-                head_lower in DISCUSSION_STOPWORDS or
-                is_semantic_heading_match(head, DISCUSSION_STOPWORDS, threshold=STOPWORD_SIM_THRESHOLD)
-            ):
-                break
-
-            # ✅ Start capturing after matching result/discussion heading
-            if not capturing and head and (
-                is_semantic_heading_match(head, MERGED_RESULTS_DISCUSSION_ANCHORS, token_level=True)
-                or is_semantic_heading_match(head, RESULTS_ANCHORS, token_level=True)
-                or is_semantic_heading_match(head, DISCUSSION_ANCHORS, token_level=True)
-            ):
+            # 1) START if we hit any of the anchors
+            if h and not capturing and is_semantic_heading_match(h, anchors, threshold =0.8):
                 capturing = True
-                matched_heading = head
+                main_heading = raw_h
+                current = {"subheading": raw_h, "content": []}
+                
 
-            if not capturing:
-                continue
+            if capturing:
+                # 2) STOP if we hit any stopword
+                if h and is_semantic_heading_match(h, stopwords, token_level=True, threshold = 0.8):
+                    break
 
-            # 🔎 Track section heading or assign fallback
-            section_heading = head if head else f"unnamed_section_{unnamed_count}"
-            if head:
-                subheadings.append(section_heading)
-            else:
-                unnamed_count += 1
+                # 3) NEW SUBSECTION if a new head appears
+                if raw_h:
+                    if current["content"]:
+                        subsections.append(current)
+                    current = {"subheading": raw_h, "content": []}
 
-            paragraphs = [
-                _clean("".join(p.itertext()))
-                for p in d.xpath(".//tei:p", namespaces=NS)
-                if _clean("".join(p.itertext()))
-            ]
-            if paragraphs:
-                sections[section_heading] = paragraphs
+                # 4) COLLECT paragraphs
+                for p in d.xpath(".//tei:p", namespaces=NS):
+                    txt = _clean("".join(p.itertext()))
+                    if txt:
+                        current["content"].append(txt)
+
+        # flush last
+        if capturing and current["content"]:
+            subsections.append(current)
 
         return {
-            "heading": "results_and_discussion",
-            "matched_heading": matched_heading,
-            "sections": sections,
-            "subheadings": subheadings
+            "heading": main_heading or "results_and_discussion",
+            "subsections": subsections
         }
 
-    # ─────────────── Final return
+    rd = extract_unified_rd()
+
     return {
-        "title": {"heading": "title", "content": title},
+        "title":    {"heading": "title",    "content": title},
         "abstract": {"heading": abstract_heading, "content": abstract},
-        "results_discussion": extract_results_discussion()
+        "results_discussion": rd
     }
