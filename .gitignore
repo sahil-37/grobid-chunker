@@ -1,11 +1,44 @@
+# Virtual Environment
+venv/
+env/
+.env/
+.venv/
+
+# Python
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+app/outputs/
+*.log
+*.env
 *.env
 *.log
 *.sqlite3
-venv/
 .envrc
-.DS_Store
 *.pdf
-outputs/

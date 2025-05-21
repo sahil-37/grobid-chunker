@@ -10,23 +10,6 @@ from app.extractors.section_extractor import extract_structured_sections
 
 router = APIRouter(prefix="/extract-all", tags=["Extract All"])
 
-def flatten_sections_to_content(section_obj: dict) -> dict:
-    """Flatten nested section dict into a content list with subheadings inline."""
-    if "sections" in section_obj:
-        flattened = []
-        subheadings = []
-        for subhead, paras in section_obj["sections"].items():
-            flattened.append(f"## {subhead}")
-            flattened.extend(paras)
-            subheadings.append(subhead)
-        return {
-            "heading": section_obj.get("heading", ""),
-            "content": flattened,
-            "subheadings": subheadings
-        }
-    return section_obj  # If already flat
-
-
 @router.post("/")
 async def extract_all_sections(files: List[UploadFile] = File(...)):
     responses = []
@@ -41,49 +24,46 @@ async def extract_all_sections(files: List[UploadFile] = File(...)):
             responses.append({"filename": up.filename, "error": "Failed to parse with GROBID"})
             continue
 
-        full_sections = extract_structured_sections(xml_str)
-        sections = {
-            "title": full_sections.get("title", {}),
-            "abstract": full_sections.get("abstract", {}),
-            "results_discussion": flatten_sections_to_content(
-                full_sections.get("results_discussion", {})
-            )
-        }
+        methods, score, methods_heading, _ = extract_methods_with_subsections(xml_str)
+        sections = extract_structured_sections(xml_str)
 
-        # Step 3: Extract methods
-        methods_struct, score, methods_heading, _, _ = extract_methods_with_subsections(xml_str)
-
-        # Step 4: Flatten methods
-        flattened_methods = []
-        for subhead, paras in methods_struct.items():
-            flattened_methods.append(f"## {subhead}")
-            flattened_methods.extend(paras)
-
+        # Inject methods
         sections["methods"] = {
             "heading": methods_heading or "Methods",
             "similarity_score": round(score, 3),
-            "content": flattened_methods
+            "content": methods
         }
 
-        # Step 5: Save outputs
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename_safe = up.filename.replace(" ", "_").replace("/", "_")
 
-        # Save .json
         json_path = os.path.join(output_dir, f"{filename_safe}_{timestamp}_all.json")
         with open(json_path, "w") as f:
             json.dump(sections, f, indent=2)
 
-        # Save .txt
         txt_path = os.path.join(output_dir, f"{filename_safe}_{timestamp}_all.txt")
         with open(txt_path, "w") as f:
-            for sec_key, sec in sections.items():
-                f.write(f"### {sec.get('heading', sec_key).upper()}\n\n")
-                if "content" in sec:
-                    for para in sec["content"]:
-                        f.write(para + "\n\n")
+            for key, sec in sections.items():
+                f.write(f"### {sec.get('heading', key).upper()}\n\n")
 
-        # Step 6: Response payload
+                if key == "methods":
+                    for sub, paras in sec.get("content", {}).items():
+                        f.write(f"#### {sub}\n")
+                        for para in paras:
+                            f.write(para + "\n\n")
+
+                elif key == "results_discussion":
+                    for subsec in sec.get("subsections", []):
+                        f.write(f"#### {subsec['subheading']}\n")
+                        for para in subsec["content"]:
+                            f.write(para + "\n\n")
+
+                elif isinstance(sec.get("content"), list):
+                    for para in sec.get("content", []):
+                        f.write(para + "\n\n")
+                else:
+                    f.write(sec.get("content", "") + "\n\n")
+
         responses.append({
             "filename": up.filename,
             "tei_xml": xml_str,

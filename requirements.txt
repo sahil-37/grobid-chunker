@@ -6,3 +6,4 @@ lxml
 torch
 transformers
 python-multipart
+hf_xet

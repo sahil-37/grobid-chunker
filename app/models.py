@@ -78,29 +78,18 @@ METHOD_KEYWORDS: set[str] = {
 }
 
 
-RESULTS_ANCHORS = {
-    "results",
+ABSTRACT_ALTERNATES = {"introduction", "background", "overview", "summary"}
+RESULTS_STOPWORDS = { "material","methods","conclusion", "references", "acknowledgements","conclusions"}
+DISCUSSION_STOPWORDS = { "material","methods","conclusion", "references", "acknowledgements","conclusions"}
+RESULTS_DISCUSSION_ANCHORS = {
+    "results and discussion", "discussion and results", "results/discussion", "results & discussion",    "results",
     "findings",
     "experimental results",
     "observations",
-    "data analysis",
     "experimental findings",
-    "research results"
-}
-
-DISCUSSION_ANCHORS = {
-    "discussion",
+    "research results",     "discussion",
     "interpretation",
     "implications",
-    "analysis and discussion",
-    "concluding remarks"
-}
-
-ABSTRACT_ALTERNATES = {"introduction", "background", "overview", "summary"}
-RESULTS_STOPWORDS = { "conclusion", "references", "acknowledgements","conclusions"}
-DISCUSSION_STOPWORDS = {"conclusion", "references", "acknowledgements","conclusions"}
-MERGED_RESULTS_DISCUSSION_ANCHORS = {
-    "results and discussion", "discussion and results", "results/discussion", "results & discussion"
 }
 
 # ─────────────────────────────  Shared resources  ──────────────────────

@@ -89,37 +89,35 @@
           if (doc.extracted_sections) {
             for (const [key, section] of Object.entries(doc.extracted_sections)) {
               const heading = section.heading || key;
-              const content = section.content || [];
-
               const block = document.createElement("div");
 
               let icon = "📘";
               const lowerKey = key.toLowerCase();
-              if (lowerKey.includes("results") && lowerKey.includes("discussion")) {
-                icon = "🧪";
-              } else if (lowerKey.includes("methods")) {
-                icon = "🔧";
-              } else if (lowerKey.includes("results")) {
-                icon = "📊";
-              } else if (lowerKey.includes("discussion")) {
-                icon = "💬";
-              } else if (lowerKey.includes("abstract")) {
-                icon = "🧾";
-              } else if (lowerKey.includes("title")) {
-                icon = "📌";
-              }
+              if (lowerKey.includes("results") && lowerKey.includes("discussion")) icon = "🧪";
+              else if (lowerKey.includes("methods")) icon = "🔧";
+              else if (lowerKey.includes("results")) icon = "📊";
+              else if (lowerKey.includes("discussion")) icon = "💬";
+              else if (lowerKey.includes("abstract")) icon = "🧾";
+              else if (lowerKey.includes("title")) icon = "📌";
 
               block.innerHTML = `<b>${icon} ${heading}</b><br><br>`;
 
-              if (Array.isArray(content)) {
-                block.innerHTML += content.map(p => {
-                  if (p.startsWith("## ")) {
-                    return `<p><strong>${p.replace("## ", "")}</strong></p>`;
-                  }
-                  return `<p>${p}</p>`;
-                }).join("");
-              } else {
-                block.innerHTML += `<p>${content}</p>`;
+              if (key === "methods" && typeof section.content === "object") {
+                for (const [subhead, paras] of Object.entries(section.content)) {
+                  block.innerHTML += `<h4>${subhead}</h4>`;
+                  block.innerHTML += Array.isArray(paras)
+                    ? paras.map(p => `<p>${p}</p>`).join("")
+                    : `<p>${paras}</p>`;
+                }
+              } else if (key === "results_discussion" && Array.isArray(section.subsections)) {
+                for (const sub of section.subsections) {
+                  block.innerHTML += `<h4>${sub.subheading}</h4>`;
+                  block.innerHTML += sub.content.map(p => `<p>${p}</p>`).join("");
+                }
+              } else if (Array.isArray(section.content)) {
+                block.innerHTML += section.content.map(p => `<p>${p}</p>`).join("");
+              } else if (typeof section.content === "string") {
+                block.innerHTML += `<p>${section.content}</p>`;
               }
 
               block.style.marginBottom = "20px";
