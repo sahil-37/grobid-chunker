@@ -5,6 +5,7 @@ __pycache__/
 *.log
 *.sqlite3
 venv/
+.venv
 .envrc
 .DS_Store
 *.pdf
