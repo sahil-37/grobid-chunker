@@ -8,7 +8,7 @@ WORD_RE = re.compile(r"[A-Za-z]+")
 def is_semantic_heading_match(
     heading: str,
     anchor_set: Set[str],
-    threshold: float = 0.9,
+    threshold: float = 0.5,
     token_level: bool = False
 ) -> bool:
     """

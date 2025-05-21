@@ -1,79 +1,79 @@
 from __future__ import annotations
-
-import re
-from typing import Any, List, Tuple
+from typing import Dict, List, Tuple
 from lxml import etree
 
 from app.models import MODEL, ANCHORS, STOPWORDS, METHOD_KEYWORDS, NS
 from app.utils.tei_helpers import _clean, _div_heading, _div_type_hint_okay
 from app.utils.semantic_utils import is_semantic_heading_match
 
-def extract_methods_section(
+def extract_methods_with_subsections(
     xml_str: str,
     sim_threshold: float = 0.65,
     fallback_threshold: float = 0.5,
-) -> Tuple[List[str], List[str], float, str | None, int]:
-    """
-    Extract methods section from TEI XML using semantic heading matching.
-
-    Returns:
-        extracted_paragraphs, raw_paragraphs, start_score, start_heading, start_idx
-    """
+) -> Tuple[Dict[str, List[str]], float, str | None, int]:
     try:
         tree = etree.fromstring(xml_str.encode())
     except Exception:
-        return [], [], 0.0, None, -1
+        return {}, 0.0, None, -1
 
     divs = tree.xpath(".//tei:body//tei:div", namespaces=NS)
     if not divs:
-        return [], [], 0.0, None, -1
+        return {}, 0.0, None, -1
 
-    capturing = False
-    stopped = False  # 🚨 Safety flag to skip divs after stop heading
+    result: Dict[str, List[str]] = {}
+    start_head: str | None = None
+    start_score: float = 0.0
+    start_idx = None
 
-    extracted_paragraphs = []
-    raw_paragraphs = []
-    start_heading: str | None = None
-    start_score = 0.0
-    start_idx = -1
-
-    for i, div in enumerate(divs):
-        if stopped:
-            continue  # 🚨 Do not process anything after stopword section
-
-        head = _div_heading(div)
-        head_lower = head.lower() if head else ""
-
-        # ───── Anchor Mode ─────
-        if not capturing and head and is_semantic_heading_match(head, ANCHORS, sim_threshold):
-            capturing = True
-            start_heading = head
+    # Anchor mode
+    for i, d in enumerate(divs):
+        h = _div_heading(d)
+        if h and is_semantic_heading_match(h, ANCHORS, sim_threshold):
+            start_head = h
             start_score = 1.0
             start_idx = i
+            break
 
-        # ───── Fallback ─────
-        elif not capturing and (
-            _div_type_hint_okay(div) or
-            (head and is_semantic_heading_match(head, METHOD_KEYWORDS, fallback_threshold, token_level=True))
-        ):
-            capturing = True
-            start_heading = head
-            start_score = fallback_threshold
-            start_idx = i
+    capturing = False
+    current_subhead = None
 
-        if not capturing:
-            continue
+    if start_idx is not None:
+        capturing = True
+        for d in divs[start_idx:]:
+            h = _div_heading(d)
+            if h and any(sw in h.lower() for sw in STOPWORDS):
+                break
+            if h:
+                current_subhead = h
+                result[current_subhead] = []
+            for p in d.xpath(".//tei:p", namespaces=NS):
+                t = _clean("".join(p.itertext()))
+                if t:
+                    result.setdefault(current_subhead or "untitled", []).append(t)
 
-        # ───── Stop Condition ─────
-        if head and any(sw in head_lower for sw in STOPWORDS):
-            stopped = True
-            continue  # Don't process this div or any after
+    else:
+        for i, d in enumerate(divs):
+            h = _div_heading(d)
+            if not h and not _div_type_hint_okay(d):
+                continue
+            if h and any(sw in h.lower() for sw in STOPWORDS):
+                if capturing:
+                    break
+                continue
+            if _div_type_hint_okay(d) or (h and is_semantic_heading_match(h, METHOD_KEYWORDS, fallback_threshold, token_level=True)):
+                if not capturing:
+                    capturing = True
+                    if h and not start_head:
+                        start_head = h
+                if h:
+                    current_subhead = h
+            if capturing:
+                for p in d.xpath(".//tei:p", namespaces=NS):
+                    t = _clean("".join(p.itertext()))
+                    if t:
+                        result.setdefault(current_subhead or "untitled", []).append(t)
 
-        # ───── Paragraph Extraction ─────
-        for p in div.xpath(".//tei:p", namespaces=NS):
-            t = _clean("".join(p.itertext()))
-            if t:
-                extracted_paragraphs.append(t)
-                raw_paragraphs.append(etree.tostring(p, encoding=str))
+        if not start_head:
+            return {}, 0.0, None, -1
 
-    return extracted_paragraphs, raw_paragraphs, start_score, start_heading, start_idx
+    return result, start_score, start_head, start_idx or -1
