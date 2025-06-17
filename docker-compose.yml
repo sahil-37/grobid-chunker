@@ -12,6 +12,14 @@ services:
       - GROBID__NB_THREADS=2
       - GROBID__MAX_CONNECTIONS=20
 
+  llmsherpa:
+    image: ghcr.io/nlmatics/nlm-ingestor:latest          # ← official LLMSherpa API
+    container_name: llmsherpa
+    restart: always
+    platform: linux/amd64
+    ports:                                               # container listens on 5001
+      - "5010:5001"                                      # host:container
+
   fastapi_app:
     build:
       context: .
@@ -24,4 +32,6 @@ services:
       - "8000:8000"
     depends_on:
       - grobid
-
+      - llmsherpa
+    environment:
+      LLMSHERPA_URL: "http://llmsherpa:5001/api/parseDocument?renderFormat=all"

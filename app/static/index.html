@@ -21,6 +21,8 @@
     canvas { width:100%; height:auto; object-fit:contain; }
     @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
     button.toggle-btn { background:#007BFF; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer; font-size:14px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+    td, th { border: 1px solid #999; padding: 4px 8px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -97,7 +99,7 @@
               else if (lowerKey.includes("methods")) icon = "🔧";
               else if (lowerKey.includes("results")) icon = "📊";
               else if (lowerKey.includes("discussion")) icon = "💬";
-              else if (lowerKey.includes("abstract")) icon = "🧾";
+              else if (lowerKey.includes("abstract")) icon = "🟞";
               else if (lowerKey.includes("title")) icon = "📌";
 
               block.innerHTML = `<b>${icon} ${heading}</b><br><br>`;
@@ -123,8 +125,35 @@
               block.style.marginBottom = "20px";
               output.appendChild(block);
             }
-          } else {
-            output.innerHTML = `<b>⚠️</b> ${doc.error || "No sections found."}`;
+          }
+
+          if (doc.tables && Array.isArray(doc.tables) && doc.tables.length > 0) {
+            const tableBlock = document.createElement("div");
+            tableBlock.innerHTML = `<b>📋 TABLES</b><br><br>`;
+            doc.tables.forEach(tbl => {
+              const cap = tbl.caption || `Table ${tbl.table_index}`;
+              tableBlock.innerHTML += `<h4>📂 ${cap}</h4>`;
+              const htmlTable = document.createElement("table");
+              tbl.rows.forEach(row => {
+                const tr = document.createElement("tr");
+                row.forEach(cell => {
+                  const td = document.createElement("td");
+                  td.textContent = cell;
+                  tr.appendChild(td);
+                });
+                htmlTable.appendChild(tr);
+              });
+              tableBlock.appendChild(htmlTable);
+              if (tbl.footnotes?.length) {
+                const fn = document.createElement("p");
+                fn.innerHTML = `<i>* ${tbl.footnotes.join("; ")}</i>`;
+                tableBlock.appendChild(fn);
+              }
+              const hr = document.createElement("hr");
+              tableBlock.appendChild(hr);
+            });
+            tableBlock.style.marginBottom = "20px";
+            output.appendChild(tableBlock);
           }
 
           body.appendChild(output);

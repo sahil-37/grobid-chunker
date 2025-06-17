@@ -7,3 +7,8 @@ torch
 transformers
 python-multipart
 hf_xet
+
+# newly required:
+pymupdf
+llmsherpa
+docling
