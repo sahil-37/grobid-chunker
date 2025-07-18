@@ -7,7 +7,7 @@ A full-stack microservice pipeline for intelligent scientific document parsing. 
 ## 🧭 Architecture Overview
 
 ```
-          PDF File
+         PDF File
              ↓
        [GROBID Container]
      → Structured TEI XML
@@ -15,8 +15,8 @@ A full-stack microservice pipeline for intelligent scientific document parsing. 
   [Section Extractor (FastAPI)]
      → Cleaned Sections (JSON)
              ↓
- [LLMSherpa (Flask) + Docling (FastAPI)]
-     → Tables, Summaries, Entities
+ [Table Extractor (Built-in)]
+     → Tables, Sections, Methods
              ↓
    Final Enriched JSON Output
 ```
