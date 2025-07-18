@@ -4,7 +4,7 @@ import os
 import json
 from datetime import datetime
 
-from app.grobid_client import send_to_grobid
+from app.grobid_client import send_to_grobid_async  # ✅ Updated import
 from app.extractors.section_extractor import extract_structured_sections
 
 router = APIRouter()
@@ -17,7 +17,7 @@ async def extract_sections_api(files: List[UploadFile] = File(...)):
 
     for up in files:
         pdf_bytes = await up.read()
-        xml_str = send_to_grobid(pdf_bytes)
+        xml_str = await send_to_grobid_async(pdf_bytes)  # ✅ Await async GROBID
 
         if not xml_str:
             responses.append({"filename": up.filename, "error": "Failed to parse with GROBID"})
@@ -28,11 +28,11 @@ async def extract_sections_api(files: List[UploadFile] = File(...)):
         filename_safe = up.filename.replace(" ", "_").replace("/", "_")
         save_path = os.path.join(output_dir, f"{filename_safe}_{timestamp}_sections.json")
 
-        with open(save_path, "w") as f:
-            json.dump(sections, f, indent=2)
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(sections, f, indent=2, ensure_ascii=False)
 
         txt_path = os.path.join(output_dir, f"{filename_safe}_{timestamp}_sections.txt")
-        with open(txt_path, "w") as f:
+        with open(txt_path, "w", encoding="utf-8") as f:
             for key, sec in sections.items():
                 f.write(f"### {sec.get('heading', key).upper()}\n")
                 content = sec.get("content", [])

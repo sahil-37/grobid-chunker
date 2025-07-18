@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 from lxml import etree
 
-from app.models import MODEL, ANCHORS, STOPWORDS, METHOD_KEYWORDS, NS
+from app.models import ANCHORS, STOPWORDS, METHOD_KEYWORDS, NS
 from app.utils.tei_helpers import _clean, _div_heading, _div_type_hint_okay
 from app.utils.semantic_utils import is_semantic_heading_match
 

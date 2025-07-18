@@ -12,3 +12,5 @@ hf_xet
 pymupdf
 llmsherpa
 docling
+httpx
+backoff

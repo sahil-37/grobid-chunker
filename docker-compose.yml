@@ -9,8 +9,9 @@ services:
       - "8070:8070"
     platform: linux/amd64
     environment:
-      - GROBID__NB_THREADS=2
-      - GROBID__MAX_CONNECTIONS=20
+      - JAVA_OPTS=-Xmx4G
+      - GROBID__NB_THREADS=8
+      - GROBID__MAX_CONNECTIONS=12
 
   llmsherpa:
     image: ghcr.io/nlmatics/nlm-ingestor:latest          # ← official LLMSherpa API

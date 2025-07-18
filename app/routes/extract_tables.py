@@ -1,8 +1,9 @@
 # app/routes/extract_tables.py
 from fastapi import APIRouter, UploadFile, File
-from typing import List
+from typing import List, Dict, Any
 import os, json
 from datetime import datetime
+
 
 from app.extractors.table_extractor import extract_tables_from_bytes
 
@@ -10,7 +11,7 @@ router = APIRouter(prefix="/extract-tables", tags=["Extract Tables"])
 
 
 @router.post("/")
-async def extract_tables(files: List[UploadFile] = File(...)):
+async def extract_tables(files: List[UploadFile] = File(...)) -> List[Dict[str, Any]]:
     """
     Upload one or more PDFs and receive their tables.
     The heavy Docling pass is skipped entirely for PDFs without tables.
