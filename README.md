@@ -1,42 +1,62 @@
-# PDF Section Extractor
+# 🧠 PDF Semantic Section Extractor Pipeline
 
-A tool for extracting sections from PDF documents using GROBID for PDF parsing and custom logic for section identification.
+A full-stack microservice pipeline for intelligent scientific document parsing. Converts PDFs into structured, semantically rich JSON using GROBID for structure parsing, a custom FastAPI service for section segmentation, and LLMSherpa + Docling for extracting tables, summaries, and semantic annotations.
 
-## Prerequisites
+---
 
-- Docker
-- Docker Compose
+## 🧭 Architecture Overview
 
-## Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd <repository-name>
+```
+          PDF File
+             ↓
+       [GROBID Container]
+     → Structured TEI XML
+             ↓
+  [Section Extractor (FastAPI)]
+     → Cleaned Sections (JSON)
+             ↓
+ [LLMSherpa (Flask) + Docling (FastAPI)]
+     → Tables, Summaries, Entities
+             ↓
+   Final Enriched JSON Output
 ```
 
-2. Start the services:
+---
+
+## ⚙️ Services and Ports
+
+| Service            | Description                                                              | Port   |
+|--------------------|--------------------------------------------------------------------------|--------|
+| `grobid`           | Parses PDF and outputs TEI XML                                            | 8070   |
+| `section-extractor`| FastAPI app that segments TEI XML into high-level sections                | 8000   |
+| `llmsherpa`        | Flask app that handles LLM-based summarization and table extraction       | 5001   |
+| `docling`          | Document interaction and table-based pipeline controller                  | 5010   |
+
+---
+
+## 🚀 Getting Started
+
+1. **Clone the repo**:
+
+```bash
+git clone <repo-url>
+cd <repo-name>
+```
+
+2. **Start services with Docker Compose**:
+
 ```bash
 docker-compose up --build
 ```
 
-This will start:
-- GROBID service on port 8070
-- Section Extractor API on port 8000
+Ensure Docker is allocated at least **4–6GB RAM**, as GROBID and LLMs can be memory-intensive.
 
-## Usage
+---
 
-### API Endpoints
+## 🔌 API Endpoints
 
-1. Extract sections from a PDF:
-```bash
-curl -X POST "http://localhost:8000/extract" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@path/to/your/file.pdf"
-```
+### 1. Extract Document Sections
 
-2. Extract all sections from a PDF:
 ```bash
 curl -X POST "http://localhost:8000/extract_all" \
   -H "accept: application/json" \
@@ -44,48 +64,145 @@ curl -X POST "http://localhost:8000/extract_all" \
   -F "file=@path/to/your/file.pdf"
 ```
 
-### Response Format
+### 2. Trigger LLM-Based Table/Summary Extraction
 
-The API returns JSON with the following structure:
+```bash
+curl -X POST "http://localhost:5010/api/parseDocument?renderFormat=all" \
+  -H "accept: application/json" \
+  -F "file=@path/to/your/file.pdf"
+```
+
+---
+
+## 🧪 Troubleshooting
+
+| Problem                                  | Solution                                                                 |
+|------------------------------------------|--------------------------------------------------------------------------|
+| `grobid` not starting                     | Make sure port 8070 is free and enough RAM is allocated in Docker        |
+| `llmsherpa` shows `could not convert string to float: '¾'` | Check for fractional unicode chars and patch with `safe_float_conversion` |
+| Missing output or broken JSON            | Check logs from all containers: `docker-compose logs -f`                 |
+| UI not loading at port 5010              | Confirm `docling` container is healthy and `.env` has correct URL        |
+
+---
+
+## 🧱 Directory Structure
+
+```
+.
+grobid_methods/
+├── Dockerfile
+├── README.md
+├── docker-compose.yml
+├── llmsherpa_output.json
+├── requirements.txt
+├── app/
+│   ├── grobid_client.py
+│   ├── main.py
+│   ├── models.py
+│   ├── outputs/
+│   ├── utils/
+│   │   ├── logger.py
+│   │   ├── semantic_utils.py
+│   │   ├── tei_helpers.py
+│   ├── extractors/
+│   │   ├── methods_extractor.py
+│   │   ├── table_extractor.py
+│   │   ├── section_extractor.py
+│   ├── routes/
+│   │   ├── extract_all.py
+│   │   ├── extract_methods.py
+│   │   ├── extract_sections.py
+│   │   ├── extract_tables.py
+│   └── static/
+│       └── index.html
+└── .venv/
+```
+
+---
+
+## 🔍 Example Output
 
 ```json
 {
-  "sections": [
-    {
-      "title": "Section Title",
-      "content": "Section content...",
-      "start_page": 1,
-      "end_page": 2
+  "filename": "example_paper.pdf",
+  "tei_xml": "<TEI>...</TEI>",
+  "extracted_sections": {
+    "title": {
+      "heading": "A Study on Protein Folding",
+      "content": "A Study on Protein Folding"
+    },
+    "abstract": {
+      "heading": "Abstract",
+      "content": [
+        "Protein folding is a fundamental process in molecular biology...",
+        "This study explores the mechanisms and influencing factors..."
+      ]
+    },
+    "methods": {
+      "heading": "Materials and Methods",
+      "content": [
+        "## Sample Preparation",
+        "Proteins were purified using affinity chromatography...",
+        "## Experimental Setup",
+        "All experiments were conducted at room temperature...",
+        "## Data Analysis",
+        "Statistical analysis was performed using Python and R."
+      ],
+      "metadata": {
+        "similarity_score": 0.98,
+        "subheadings": [
+          "Sample Preparation",
+          "Experimental Setup",
+          "Data Analysis"
+        ]
+      }
+    },
+    "results": {
+      "heading": "Results",
+      "content": [
+        "The folding rates increased with temperature...",
+        "A significant difference was observed between wild-type and mutant proteins."
+      ]
+    },
+    "discussion": {
+      "heading": "Discussion",
+      "content": [
+        "Our findings suggest a new pathway for protein folding...",
+        "Further research is needed to validate these results."
+      ]
     }
-  ]
+  }
 }
 ```
 
-## Development
+---
 
-The project structure:
-```
-.
-├── app/
-│   ├── main.py              # FastAPI application
-│   ├── methods_extractor.py # Section extraction logic
-│   └── utils.py            # Utility functions
-├── Dockerfile              # Docker configuration
-├── docker-compose.yml      # Docker Compose configuration
-└── requirements.txt        # Python dependencies
-```
+## 📚 Technologies Used
 
-## Troubleshooting
+- **Python** – FastAPI & Flask for service APIs
+- **Docker** – container orchestration
+- **GROBID** – for scientific PDF parsing
+- **LLMSherpa** – LLM wrapper for semantic processing
+- **Docling** – UI + microservice orchestration
 
-1. If GROBID fails to start:
-   - Check if port 8070 is available
-   - Ensure you have enough memory allocated to Docker
+---
 
-2. If the section extractor fails:
-   - Check the logs: `docker-compose logs section-extractor`
-   - Verify the PDF file is not corrupted
-   - Ensure the PDF has proper section headers
+## 🧠 Lessons Learned
 
-## License
+- Concurrency issues were resolved by managing thread pools and limiting LLM calls per request.
+- A critical production bug involved `string to float` conversion due to Unicode fractions like `'¾'`; handled via a sanitization function.
+- Logs across containers were unified for easier debugging.
 
-[Your License]
+---
+
+## 🪪 License
+
+MIT License — fork and adapt as needed.
+
+---
+
+## 🙌 Acknowledgements
+
+- GROBID for powerful PDF parsing
+- Open-source LLM frameworks
+- FastAPI and Flask communities
