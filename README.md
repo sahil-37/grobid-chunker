@@ -3,6 +3,8 @@
 A full-stack microservice pipeline for intelligent scientific document parsing. Converts PDFs into structured, semantically rich JSON using GROBID for structure parsing, a custom FastAPI service for section segmentation, and LLMSherpa + Docling for extracting tables, summaries, and semantic annotations.
 
 ---
+<img width="1448" height="680" alt="Screenshot 2025-07-19 at 2 29 58 PM" src="https://github.com/user-attachments/assets/c2df2f64-d779-4d43-aa6c-765635c3995b" />
+
 
 ## 🧭 Architecture Overview
 
