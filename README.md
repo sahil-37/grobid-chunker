@@ -203,8 +203,18 @@ MIT License — fork and adapt as needed.
 
 ---
 
-## 🙌 Acknowledgements
+---
 
-- GROBID for powerful PDF parsing
-- Open-source LLM frameworks
-- FastAPI and Flask communities
+## 🧰 References & Tools
+
+- **GROBID** – [GROBID GitHub](https://github.com/kermitt2/grobid): ML-based library for parsing PDFs (especially scientific papers) into structured TEI XML formats.
+- **Open-Source LLM Frameworks**:
+  - [LangChain](https://github.com/hwchase17/langchain): Framework for building LLM-powered applications with chaining, agents, and retrieval.
+  - [LlamaIndex](https://github.com/jerryjliu/llama_index): Connects LLMs to external data sources for retrieval-augmented generation.
+  - [Hugging Face Transformers](https://github.com/huggingface/transformers): Industry-standard library for using and fine-tuning open-source LLMs.
+  - [List of Open LLMs](https://github.com/eugeneyan/open-llms): Curated repository of open-source LLMs and tools.
+- **Web Frameworks**:
+  - [FastAPI](https://fastapi.tiangolo.com/): High-performance Python web framework for APIs, built on Starlette and Pydantic.
+  - [Flask](https://flask.palletsprojects.com/): Lightweight Python web framework with a modular, extensible design.
+
+---
